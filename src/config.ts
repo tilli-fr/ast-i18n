@@ -28,6 +28,10 @@ const defaultConfig: ASTConfig = {
     'style',
     'to',
     'href',
+    'routeSlug',
+    'rotate',
+    'justifyContent',
+    'data-cy',
   ],
   blackListCallExpressionCalle: [
     't',

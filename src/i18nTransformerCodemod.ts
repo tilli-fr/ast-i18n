@@ -221,46 +221,6 @@ function translateFunctionArguments(j: JSCodeshift, root: Collection<any>) {
   return hasI18nUsage;
 }
 
-// function translateObjectProperties(j: JSCodeshift, root: Collection<any>) {
-//   let hasI18nUsage = false;
-
-//   root
-//     .find(j.ObjectExpression)
-//     .forEach((path: NodePath<ObjectExpression>) => {
-//       path.node.properties = path.node.properties.map(prop => {
-//         if (prop.value && prop.value.type === 'StringLiteral') {
-//           // const key = getStableKey(prop.value.value);
-//           const key = prop.value.value;
-//           console.log('prop.value')
-//           console.log(prop.value)
-//           prop.value = tCallExpression(j, key);
-//           hasI18nUsage = true;
-//         }
-//         return prop;
-//       });
-//     });
-
-//   return hasI18nUsage;
-// }
-// function translateObjectProperties(j: JSCodeshift, root: Collection<any>) {
-//   let hasI18nUsage = false;
-//   const blackList = getAstConfig().blackListObjectKey;
-
-//   root
-//     .find(j.ObjectExpression)
-//     .forEach((path: NodePath<ObjectExpression>) => {
-//       path.node.properties = path.node.properties.map(prop => {
-//         if (!blackList.includes(prop.key.name) && prop.value && prop.value.type === 'StringLiteral') {
-//           const key = prop.value.value;
-//           prop.value = tCallExpression(j, key);
-//           hasI18nUsage = true;
-//         }
-//         return prop;
-//       });
-//     });
-
-//   return hasI18nUsage;
-// }
 function translateObjectProperties(j: JSCodeshift, root: Collection<any>) {
   let hasI18nUsage = false;
   const blackList = getAstConfig().blackListObjectKey;
@@ -269,13 +229,13 @@ function translateObjectProperties(j: JSCodeshift, root: Collection<any>) {
     .find(j.ObjectExpression)
     .forEach((path: NodePath<ObjectExpression>) => {
       // Check if the parent key is in the blacklist
-      console.log(path.parent.node.type, path.parent.node?.key?.name);
+      // console.log(path.parent.node.type, path.parent.node?.key?.name);
       if (path.parent.node.type === 'ObjectProperty' && blackList.includes(path.parent.node.key.name)) {
         return;
       }
 
       path.node.properties = path.node.properties.map(prop => {
-        if (!blackList.includes(prop.key.name) && prop.value && prop.value.type === 'StringLiteral') {
+        if (!blackList.includes(prop.key.name) && prop.value && prop.value.type === 'StringLiteral' && prop.parentPath?.name !== 'jsxExpressionContainer') {
           const key = prop.value.value;
           prop.value = tCallExpression(j, key);
           hasI18nUsage = true;
@@ -327,11 +287,19 @@ function translateJsxContent(j: JSCodeshift, root: Collection<any>) {
         ));
       }
       if (newChildren.length > 0) {
-        //n.value.children = newChildren;
         n.replace(
           j.jsxElement(
-            n.node.openingElement, n.node.closingElement,
-            newChildren
+            n.node.openingElement,
+            n.node.closingElement,
+            n.node.children.map(child => {
+              if (child.type === 'JSXExpressionContainer' && child.expression.type === 'StringLiteral') {
+                // If the child is a string literal inside a JSXExpressionContainer, replace it
+                const index = n.node.children.indexOf(child);
+                return newChildren[index];
+              }
+              // If the child is not a string literal inside a JSXExpressionContainer, leave it as is
+              return child;
+            })
           )
         )
       }
