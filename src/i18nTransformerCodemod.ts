@@ -8,6 +8,7 @@ import {
   JSXExpressionContainer
 } from "ast-types/gen/nodes";
 import { NodePath } from "ast-types";
+import { getAstConfig } from './config';
 
 const tCallExpression = (j: JSCodeshift, key: string) => {
   return j.callExpression(
@@ -18,24 +19,24 @@ const tCallExpression = (j: JSCodeshift, key: string) => {
 
 const getImportStatement = (useHoc: boolean = true, useHooks: boolean = false) => {
   if (useHoc && !useHooks) {
-    return `import { withTranslation } from 'react-i18next';`;
+    return `import { withTranslation } from 'gatsby-plugin-react-i18next';`;
   }
 
   if (useHooks && !useHoc) {
-    return `import { useTranslation } from 'react-i18next';`;
+    return `import { useTranslation } from 'gatsby-plugin-react-i18next';`;
   }
 
-  return `import { useTranslation, withTranslation } from 'react-i18next';`;
+  return `import { useTranslation, withTranslation } from 'gatsby-plugin-react-i18next';`;
 };
 
 const addI18nImport = (j: JSCodeshift, root: Collection<any>, {useHooks, useHoc}: any) => {
   // TODO - handle hoc or hooks based on file
   const statement = getImportStatement(useHoc, useHooks);
 
-  // check if there is a react-i18next import already
+  // check if there is a gatsby-plugin-react-i18next import already
   const reactI18nNextImports = root
     .find(j.ImportDeclaration)
-    .filter((path : NodePath<ImportDeclaration>) => path.node.source.value === 'react-i18next');
+    .filter((path : NodePath<ImportDeclaration>) => path.node.source.value === 'gatsby-plugin-react-i18next');
 
   if (reactI18nNextImports.length > 0) {
     return;
@@ -69,6 +70,7 @@ function transform(file: FileInfo, api: API, options: Options) {
   hasI18nUsage = translateJsxContent(j, root) || hasI18nUsage;
   hasI18nUsage = translateJsxProps(j, root) || hasI18nUsage;
   hasI18nUsage = translateFunctionArguments(j, root) || hasI18nUsage;
+  hasI18nUsage = translateObjectProperties(j, root) || hasI18nUsage;
 
   if (hasI18nUsage) {
     // export default withTranslation()(Component)
@@ -94,7 +96,7 @@ function transform(file: FileInfo, api: API, options: Options) {
 
           if(!hookFound) {
             hocUsed = true;
-            path.node.declaration = withTranslationHoc(j, j.identifier(exportDeclaration.name));
+            // path.node.declaration = withTranslationHoc(j, j.identifier(exportDeclaration.name));
             const classDeclaration = root.find(j.ClassDeclaration, (n) => n.id.name === exportDeclaration.name)
               .nodes()[0];
             if (classDeclaration) {
@@ -126,7 +128,7 @@ function transform(file: FileInfo, api: API, options: Options) {
 
           if (!hooksUsed) {
             hooksUsed = true;
-            path.node.declaration = withTranslationHoc(j, exportDeclaration);
+            // path.node.declaration = withTranslationHoc(j, exportDeclaration);
           }
         } else if (j.FunctionDeclaration.check(exportDeclaration)) {
           hooksUsed = true;
@@ -214,6 +216,72 @@ function translateFunctionArguments(j: JSCodeshift, root: Collection<any>) {
           return arg;
         })
       }
+    });
+
+  return hasI18nUsage;
+}
+
+// function translateObjectProperties(j: JSCodeshift, root: Collection<any>) {
+//   let hasI18nUsage = false;
+
+//   root
+//     .find(j.ObjectExpression)
+//     .forEach((path: NodePath<ObjectExpression>) => {
+//       path.node.properties = path.node.properties.map(prop => {
+//         if (prop.value && prop.value.type === 'StringLiteral') {
+//           // const key = getStableKey(prop.value.value);
+//           const key = prop.value.value;
+//           console.log('prop.value')
+//           console.log(prop.value)
+//           prop.value = tCallExpression(j, key);
+//           hasI18nUsage = true;
+//         }
+//         return prop;
+//       });
+//     });
+
+//   return hasI18nUsage;
+// }
+// function translateObjectProperties(j: JSCodeshift, root: Collection<any>) {
+//   let hasI18nUsage = false;
+//   const blackList = getAstConfig().blackListObjectKey;
+
+//   root
+//     .find(j.ObjectExpression)
+//     .forEach((path: NodePath<ObjectExpression>) => {
+//       path.node.properties = path.node.properties.map(prop => {
+//         if (!blackList.includes(prop.key.name) && prop.value && prop.value.type === 'StringLiteral') {
+//           const key = prop.value.value;
+//           prop.value = tCallExpression(j, key);
+//           hasI18nUsage = true;
+//         }
+//         return prop;
+//       });
+//     });
+
+//   return hasI18nUsage;
+// }
+function translateObjectProperties(j: JSCodeshift, root: Collection<any>) {
+  let hasI18nUsage = false;
+  const blackList = getAstConfig().blackListObjectKey;
+
+  root
+    .find(j.ObjectExpression)
+    .forEach((path: NodePath<ObjectExpression>) => {
+      // Check if the parent key is in the blacklist
+      console.log(path.parent.node.type, path.parent.node?.key?.name);
+      if (path.parent.node.type === 'ObjectProperty' && blackList.includes(path.parent.node.key.name)) {
+        return;
+      }
+
+      path.node.properties = path.node.properties.map(prop => {
+        if (!blackList.includes(prop.key.name) && prop.value && prop.value.type === 'StringLiteral') {
+          const key = prop.value.value;
+          prop.value = tCallExpression(j, key);
+          hasI18nUsage = true;
+        }
+        return prop;
+      });
     });
 
   return hasI18nUsage;

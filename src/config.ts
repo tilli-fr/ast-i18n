@@ -5,6 +5,7 @@ const explorer = cosmiconfig('ast');
 type ASTConfig = {
   blackListJsxAttributeName: string[],
   blackListCallExpressionCalle: string[],
+  blackListObjectKey: string[],
 }
 
 const defaultConfig: ASTConfig = {
@@ -17,6 +18,16 @@ const defaultConfig: ASTConfig = {
     'valueKey',
     'labelValue',
     'className',
+    'preFilledSteps',
+    'fromInteraction',
+    'color',
+    'size',
+    'variant',
+    'variantColor',
+    'textDecoration',
+    'style',
+    'to',
+    'href',
   ],
   blackListCallExpressionCalle: [
     't',
@@ -25,6 +36,25 @@ const defaultConfig: ASTConfig = {
     'routeTo',
     'format',
     'importScripts',
+  ],
+  blackListObjectKey: [
+    'type',
+    'id',
+    'children',
+    'labelKey',
+    'valueKey',
+    'labelValue',
+    'className',
+    'preFilledSteps',
+    'fromInteraction',
+    'color',
+    'size',
+    'variant',
+    'variantColor',
+    'textDecoration',
+    'style',
+    'to',
+    'href',
   ],
 };
 
