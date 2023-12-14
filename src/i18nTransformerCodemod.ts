@@ -60,7 +60,7 @@ function transform(file: FileInfo, api: API, options: Options) {
 
   const printOptions = options.printOptions || {
     quote: 'single',
-    trailingComma: false,
+    trailingComma: true,
     // TODO make this configurable
     lineTerminator: '\n'
   };
@@ -87,6 +87,16 @@ function transform(file: FileInfo, api: API, options: Options) {
       .forEach(path => {
         let exportDeclaration = path.node.declaration;
 
+        // If the exported default is a CallExpression (like a HOC)
+        while (exportDeclaration.type === 'CallExpression') {
+          // If there is at least one argument (which should be the component)
+          if (exportDeclaration.arguments.length > 0) {
+            exportDeclaration = exportDeclaration.arguments[0];
+          } else {
+            break;
+          }
+        }
+
         if (j.Identifier.check(exportDeclaration)) {
           const exportedName = exportDeclaration.name;
           const functions = findFunctionByIdentifier(j, exportedName, root);
@@ -100,17 +110,18 @@ function transform(file: FileInfo, api: API, options: Options) {
             const classDeclaration = root.find(j.ClassDeclaration, (n) => n.id.name === exportDeclaration.name)
               .nodes()[0];
             if (classDeclaration) {
-               const renderMethod = classDeclaration.body.body.find(
-                 n => j.ClassMethod.check(n) && n.key.name === 'render'
-               );
-               if (renderMethod) {
-                 renderMethod.body = j.blockStatement([
-                   createTranslationDefinition(j),
-                   ...renderMethod.body.body
-                 ])
-               }
-            }
+              classDeclaration.body.body.forEach(method => {
+                if (j.ClassMethod.check(method)) {
+                  // Check if the method uses 't'
+                  const usesT = j(method).find(j.Identifier, { name: 't' }).size() > 0;
 
+                  if (usesT) {
+                    // Add 'const { t } = this.props;' at the beginning of the method
+                    method.body.body.unshift(createTranslationDefinition(j));
+                  }
+                }
+              });
+            }
           } else {
             hooksUsed = true;
           }
